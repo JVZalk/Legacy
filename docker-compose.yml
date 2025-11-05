@@ -1,0 +1,32 @@
+services:
+  # 1. Nosso serviço de banco de dados
+  db:
+    image: postgres:16-alpine # A imagem oficial do Postgres. '16-alpine' é leve e rápida.
+    container_name: legacy_db # Um nome fácil para o contêiner
+    restart: always # Sempre reinicia o container se ele parar
+    
+    # 2. As variáveis de ambiente
+    # Isso é o que o contêiner Postgres usa para se autoconfigurar na primeira vez.
+    # Ele cria o usuário e o banco de dados para nós.
+    environment:
+      POSTGRES_USER: legacy_user
+      POSTGRES_PASSWORD: uma_senha_forte_aqui # senha forte (guarde no seu .env!)
+      POSTGRES_DB: projeto_legado
+      
+    # 3. Mapeamento de Portas
+    # Conecta a porta 5432 do "nosso computador" (host)
+    # com a porta 5432 de "dentro do contêiner".
+    ports:
+      - "5433:5432"
+      
+    # 4. Persistência de Dados (O MAIS IMPORTANTE)
+    # Sem isso, seus dados somem toda vez que o contêiner é recriado.
+    # Isso mapeia uma pasta 'legacy_db_data' no seu computador
+    # para a pasta onde o Postgres salva os dados *dentro* do contêiner.
+    volumes:
+      - legacy_db_data:/var/lib/postgresql/data
+
+# 5. Definição do Volume
+# Isso diz ao Docker para criar e gerenciar o volume 'legacy_db_data'
+volumes:
+  legacy_db_data:

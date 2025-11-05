@@ -16,3 +16,6 @@ venv/
 # Arquivos do SQLite (se estivesse usando)
 *.db
 *.sqlite3
+
+# Docker
+.dockerignore
