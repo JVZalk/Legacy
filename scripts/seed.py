@@ -1,5 +1,25 @@
-# seed.py
-from models import SessionLocal, Question, engine, Base
+# scripts/seed.py
+import sys
+import os
+
+# --- A MÁGICA DA CONFIGURAÇÃO DE CAMINHO ---
+# Este script está "fora" do nosso aplicativo.
+# Para que ele possa importar 'legacy_app.db.models' e outros,
+# precisamos adicionar a pasta raiz do projeto ('/projetos/Legacy')
+# ao caminho de busca do Python (PYTHONPATH).
+
+# Pega o caminho do diretório onde o script está (/projetos/Legacy/scripts)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Pega o caminho do diretório pai (/projetos/Legacy)
+project_root = os.path.dirname(script_dir)
+# Adiciona o diretório pai ao sys.path
+sys.path.append(project_root)
+
+# Agora podemos importar nossos módulos como se estivéssemos dentro do app
+from legacy_app.db.database import SessionLocal, init_db, engine
+from legacy_app.db.models import Question, Base
+
+# -----------------------------------------------------------------
 
 # 1. Defina sua lista de perguntas
 # (Categoria, Texto, Ordem)
@@ -17,7 +37,7 @@ QUESTIONS_TO_ADD = [
     ("Juventude", "Qual foi a maior aventura que você viveu quando jovem?", 8),
 
     # Família
-    ("Família", "Como você conheceu [nome do cônjuge/parceiro(a)]?", 9),
+    ("Família", "Como você conheceu seu cônjuge/parceiro(a)?", 9),
     ("Família", "Qual é a sua lembrança favorita de quando seus filhos eram pequenos?", 10),
     ("Família", "Qual tradição de família é mais importante para você?", 11),
 
@@ -34,13 +54,16 @@ def populate_questions():
     evitando duplicatas pela coluna 'order'.
     """
     print("Iniciando a semeadura (seeding) de perguntas...")
-    db = SessionLocal()
+    # Usamos o SessionLocal da nossa nova arquitetura
+    db = SessionLocal() 
     
     try:
+        # Busca todas as 'ordens' que já existem no banco
         current_orders = {q.order for q in db.query(Question.order).all()}
         
         questions_added = 0
         for category, text, order in QUESTIONS_TO_ADD:
+            # Só adiciona se a 'ordem' não estiver na lista de ordens atuais
             if order not in current_orders:
                 new_question = Question(
                     question_text=text,
@@ -60,11 +83,27 @@ def populate_questions():
         print(f"Erro ao popular o banco de dados: {e}")
         db.rollback()
     finally:
-        db.close()
+        db.close() # Sempre feche a sessão
 
 if __name__ == "__main__":
-    # Garante que as tabelas existam antes de tentar popular
-    Base.metadata.create_all(bind=engine)
+    # 1. Garante que o Docker (ou Postgres local) esteja rodando.
     
-    # Popula o banco
+    # 2. Chama a função init_db() do 'database.py'
+    #    Isso garante que as tabelas existam antes de tentar popular.
+    try:
+        # Usamos o 'engine' importado para verificar se o DB está de pé
+        # antes de tentar criar as tabelas.
+        with engine.connect() as connection:
+            print("Conexão com o banco de dados bem-sucedida.")
+        
+        # Agora chama a função que executa o Base.metadata.create_all()
+        init_db() 
+    
+    except Exception as e:
+        print(f"ERRO: Não foi possível conectar ao banco de dados ou criar tabelas.")
+        print(f"Detalhe: {e}")
+        print("Por favor, garanta que o contêiner Docker do Postgres esteja rodando (`docker-compose up -d`)")
+        sys.exit(1) # Sai do script se não puder conectar
+
+    # 3. Popula o banco
     populate_questions()
